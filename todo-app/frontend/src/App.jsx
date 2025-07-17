@@ -10,7 +10,7 @@ import Login from './components/Login';
 
 const App = () => {
 
-  const API_BASE = 'http://localhost/taskly/taskly/backend/';
+  const API_BASE = 'http://localhost:5000/api/';
   // tasks: Array holding all todo tasks
   const [tasks, setTasks] = useState([]);
 
@@ -44,10 +44,10 @@ const App = () => {
   //   console.log('Saved to storage:', tasks);
   // }, [tasks]);
   useEffect(() => {
-    fetch(`${API_BASE}getTasks.php`)
+    fetch(`${API_BASE}tasks`)
       .then(response => response.json())
       .then(data => setTasks(data));
-  }, [tasks]);
+  }, []); // Only run on mount
 // it will run every time tasks changes
 
 
@@ -59,8 +59,7 @@ const App = () => {
   // };
 
   const handleAddTask = (newTask) => {
-    const taskWithFavorite = { ...newTask, isFavorite: false }; // Default to false
-    fetch(`${API_BASE}addTasks.php`, {
+    fetch(`${API_BASE}tasks`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -71,16 +70,10 @@ const App = () => {
       if (!response.ok) {
         throw new Error('Failed to add task');
       }
-      return fetch(`${API_BASE}getTasks.php`);
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Failed to fetch tasks');
-      }
       return response.json();
     })
     .then(data => {
-      setTasks(data);
+      setTasks(prev => [...prev, data]);
       setSuccessMessage('Task Created Successfully!');
       setTimeout(() => setSuccessMessage(''), 1000);
     })
@@ -102,26 +95,21 @@ const App = () => {
   // UPDATE
   const handleUpdateTask = async (updatedTask) => {
     try {
-      const res = await fetch(`${API_BASE}updateTasks.php`, {
-        method: 'POST',
+      const res = await fetch(`${API_BASE}tasks/${updatedTask.id}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(updatedTask)
       });
-  
-      const result = await res.json();
-  
-      if (!res.ok || result.message !== "Task updated successfully.") {
+      if (!res.ok) {
         alert("Something went wrong while updating the task.");
         return;
       }
-  
-      // Refresh task list
-      const taskRes = await fetch(`${API_BASE}getTasks.php`);
-      const data = await taskRes.json();
-      setTasks(data);
-  
+      const data = await res.json();
+      setTasks(prev => prev.map(task => task.id === data.id ? data : task));
+      setSuccessMessage('Task updated successfully!');
+      setTimeout(() => setSuccessMessage(''), 1000);
     } catch (error) {
       console.error("Error updating task:", error);
       alert("Something went wrong.");
@@ -132,26 +120,17 @@ const App = () => {
   const handleDeleteTask = async (id) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this task?");
     if (!confirmDelete) return;
-  
     try {
-      const res = await fetch(`${API_BASE}deleteTasks.php`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id }),
+      const res = await fetch(`${API_BASE}tasks/${id}`, {
+        method: 'DELETE'
       });
-  
-      const result = await res.json();
-  
-      if (result.message === "Task deleted successfully.") {
-        // Refresh the task list
-        const taskRes = await fetch(`${API_BASE}getTasks.php`);
-        const data = await taskRes.json();
-        setTasks(data);
-      } else {
-        alert("Something went wrong: " + result.message);
+      if (!res.ok) {
+        alert("Something went wrong while deleting the task.");
+        return;
       }
+      setTasks(prev => prev.filter(task => task.id !== id));
+      setSuccessMessage('Task deleted successfully!');
+      setTimeout(() => setSuccessMessage(''), 1000);
     } catch (error) {
       console.error("Delete error:", error);
       alert("Something went wrong while deleting the task.");
@@ -190,25 +169,19 @@ const App = () => {
   const handleDoneTask = async (id) => {
     const task = tasks.find(t => t.id === id);
     const newStatus = task.status === 'Done' ? 'Open' : 'Done';
-  
     try {
-      const res = await fetch(`${API_BASE}updateStatus.php`, {
-        method: 'POST',
+      const res = await fetch(`${API_BASE}tasks/${id}/status`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: newStatus })
+        body: JSON.stringify({ status: newStatus })
       });
-  
-      const result = await res.json();
-  
-      if (result.message === 'Status updated') {
-        const taskRes = await fetch(`${API_BASE}getTasks.php`);
-        const data = await taskRes.json();
-        setTasks(data);
-        setSuccessMessage(`Task marked as ${newStatus} successfully!`);
-        setTimeout(() => setSuccessMessage(''), 1000);
-      } else {
-        throw new Error(result.message);
+      if (!res.ok) {
+        throw new Error('Failed to update status');
       }
+      const data = await res.json();
+      setTasks(prev => prev.map(task => task.id === id ? data : task));
+      setSuccessMessage(`Task marked as ${newStatus} successfully!`);
+      setTimeout(() => setSuccessMessage(''), 1000);
     } catch (err) {
       console.error(err);
       alert('Failed to update task status');
@@ -237,25 +210,19 @@ const App = () => {
   // };
   const handleToggleFavorite = async (id, isCurrentlyFavorite) => {
     const newFavoriteStatus = !isCurrentlyFavorite;
-  
     try {
-      const res = await fetch(`${API_BASE}toggleFavorite.php`, {
-        method: 'POST',
+      const res = await fetch(`${API_BASE}tasks/${id}/favorite`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, isFavorite: newFavoriteStatus })
+        body: JSON.stringify({ isFavorite: newFavoriteStatus })
       });
-  
-      const result = await res.json();
-  
-      if (result.message === 'Favorite status updated') {
-        const taskRes = await fetch(`${API_BASE}getTasks.php`);
-        const data = await taskRes.json();
-        setTasks(data);
-        setSuccessMessage('Task favorite status updated!');
-        setTimeout(() => setSuccessMessage(''), 1000);
-      } else {
-        throw new Error(result.message);
+      if (!res.ok) {
+        throw new Error('Failed to update favorite status');
       }
+      const data = await res.json();
+      setTasks(prev => prev.map(task => task.id === id ? data : task));
+      setSuccessMessage('Task favorite status updated!');
+      setTimeout(() => setSuccessMessage(''), 1000);
     } catch (err) {
       console.error(err);
       alert('Failed to update favorite status');

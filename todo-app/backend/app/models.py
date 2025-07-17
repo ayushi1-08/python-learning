@@ -9,6 +9,8 @@ class Task(db.Model):
     status = db.Column(db.String(20), default='Open')
     isFavorite = db.Column(db.Boolean, default=False)
     assignee = db.Column(db.String(50))
+    dueDate = db.Column(db.Date)
+    priority = db.Column(db.String(20))  # or Integer, if you want numbers
 
     def to_dict(self):
         return {
@@ -17,5 +19,7 @@ class Task(db.Model):
             'description': self.description,
             'status': self.status,
             'isFavorite': self.isFavorite,
-            'assignee': self.assignee
+            'assignee': self.assignee,
+            'dueDate': self.dueDate.isoformat() if self.dueDate else None,
+            'priority': self.priority  
         }
